@@ -1,0 +1,144 @@
+<?php
+// central router after login, consolidating previous dashboard/index.php
+require_once __DIR__ . '/includes/session.php';
+require_once __DIR__ . '/includes/rbac.php';
+require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/includes/audit.php';
+require_once __DIR__ . '/includes/csrf.php';
+
+// Prevent caching for protected content
+header("Cache-Control: no-store, no-cache, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
+
+// ensure authenticated
+if (!isset($_SESSION["user_id"], $_SESSION["role_id"])) {
+    header("Location: auth/login.php");
+    exit;
+}
+
+$role_id = (int)$_SESSION["role_id"];
+$page = $_GET['page'] ?? 'dashboard';
+
+// Handle POST-only handlers before rendering sidebar (to prevent headers-already-sent errors)
+if ($page === 'request_correction' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireRole([1]);
+    ob_start();
+    include __DIR__ . '/faculty/request_correction.php';
+    ob_end_clean();
+    exit;
+}
+
+// include sidebar (role-based) and output layout wrapper
+include __DIR__ . '/template/sidebar.php';
+?>
+    <!-- Main Content Container -->
+    <main class="main-content" id="mainContent">
+        <div style="max-width: 1400px; margin: 0 auto;">
+            <?php
+            switch ($page) {
+                case 'dashboard':
+                    if ($role_id === 1) {
+                        ob_start();
+                        include __DIR__ . '/faculty/dashboard.php';
+                        echo ob_get_clean();
+                    } elseif ($role_id === 2) {
+                        ob_start();
+                        include __DIR__ . '/registrar/dashboard.php';
+                        echo ob_get_clean();
+                    } elseif ($role_id === 3) {
+                        ob_start();
+                        include __DIR__ . '/student/dashboard.php';
+                        echo ob_get_clean();
+                    }
+                    break;
+
+                // Faculty pages
+                case 'subjects':
+                    requireRole([1]);
+                    echo '<h2>My Assigned Subjects</h2>';
+                    echo '<p>Subject list would go here</p>';
+                    break;
+                case 'submit_grades':
+                    requireRole([1]);
+                    ob_start();
+                    include __DIR__ . '/faculty/submit_grades.php';
+                    echo ob_get_clean();
+                    break;
+                case 'view_grades':
+                    if ($role_id === 1) {
+                        requireRole([1]);
+                        ob_start();
+                        include __DIR__ . '/faculty/grade_sheet.php';
+                        echo ob_get_clean();
+                    } else {
+                        requireRole([3]);
+                        ob_start();
+                        include __DIR__ . '/student/view_grades.php';
+                        echo ob_get_clean();
+                    }
+                    break;
+                case 'request_correction':
+                    requireRole([1]);
+                    ob_start();
+                    include __DIR__ . '/faculty/request_correction.php';
+                    echo ob_get_clean();
+                    break;
+
+                // Registrar pages
+                case 'pending_enrollments':
+                    requireRole([2]);
+                    ob_start();
+                    include __DIR__ . '/registrar/pending_enrollments.php';
+                    echo ob_get_clean();
+                    break;
+                case 'pending_grades':
+                    requireRole([2]);
+                    ob_start();
+                    include __DIR__ . '/registrar/pending_grades.php';
+                    echo ob_get_clean();
+                    break;
+                case 'pending_corrections':
+                    requireRole([2]);
+                    ob_start();
+                    include __DIR__ . '/registrar/approve_correction.php';
+                    echo ob_get_clean();
+                    break;
+
+                // Student pages
+                case 'request_enrollment':
+                    requireRole([3]);
+                    ob_start();
+                    include __DIR__ . '/student/enrollment_request.php';
+                    echo ob_get_clean();
+                    break;
+                case 'enrollment_status':
+                    requireRole([3]);
+                    ob_start();
+                    include __DIR__ . '/student/enrollment_status.php';
+                    echo ob_get_clean();
+                    break;
+
+                // Shared
+
+                default:
+                    if ($role_id === 1) {
+                        ob_start();
+                        include __DIR__ . '/faculty/dashboard.php';
+                        echo ob_get_clean();
+                    } elseif ($role_id === 2) {
+                        ob_start();
+                        include __DIR__ . '/registrar/dashboard.php';
+                        echo ob_get_clean();
+                    } elseif ($role_id === 3) {
+                        ob_start();
+                        include __DIR__ . '/student/dashboard.php';
+                        echo ob_get_clean();
+                    }
+            }
+            ?>
+        </div>
+    </main>
+
+</body>
+</html>
